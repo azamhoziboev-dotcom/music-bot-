@@ -14,7 +14,7 @@ from aiogram.types import (
 from aiogram.filters import CommandStart
 import yt_dlp
 
-# Безопасное получение токена
+# Безопасное получение токена из переменных Amvera
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=BOT_TOKEN)
@@ -44,17 +44,17 @@ contacts_inline = InlineKeyboardMarkup(
 @dp.message(CommandStart())
 async def start_cmd(message: Message):
     welcome_text = (
-        "✨ Добро пожаловать в элитный музыкальный бот!\n\n"
+        "✨ **Добро пожаловать в элитный музыкальный бот!**\n\n"
         "🎧 Здесь ты можешь найти и скачать абсолютно любой трек в высоком качестве.\n\n"
-        "👇 Просто отправь мне название песни или имя исполнителя!"
+        "👇 **Просто отправь мне название песни или имя исполнителя!**"
     )
     await message.answer(welcome_text, reply_markup=main_keyboard, parse_mode="Markdown")
 
 @dp.message(F.text == "ℹ️ Помощь")
 async def help_cmd(message: Message):
     help_text = (
-        "📌 Как пользоваться ботом:\n\n"
-        "1️⃣ Напиши название песни в чат (например: Miyagi - Utopia).\n"
+        "📌 **Как пользоваться ботом:**\n\n"
+        "1️⃣ Напиши название песни в чат (например: `Miyagi - Utopia`).\n"
         "2️⃣ Бот пришлет удобный список результатов.\n"
         "3️⃣ Нажми на цифру с нужным треком для скачивания.\n"
         "4️⃣ Используй стрелочки ◀️ ▶️ для переключения страниц!"
@@ -63,12 +63,12 @@ async def help_cmd(message: Message):
 
 @dp.message(F.text == "🔥 Популярное")
 async def top_cmd(message: Message):
-    await message.answer("🔥 Популярные запросы сегодня:\n1. Miyagi\n2. Xcho\n3. Macan\n4. INSTASAMKA\n\nОтправь имя любого из них для поиска!")
+    await message.answer("🔥 **Популярные запросы сегодня:**\n1. Miyagi\n2. Xcho\n3. Macan\n4. INSTASAMKA\n\nОтправь имя любого из них для поиска!")
 
 @dp.message(F.text == "📞 Поддержка & Контакты")
 async def contacts_cmd(message: Message):
     await message.answer(
-        "🤝 Связь с нами и поддержка:\nВыберите нужный раздел ниже:",
+        "🤝 **Связь с нами и поддержка:**\nВыберите нужный раздел ниже:",
         reply_markup=contacts_inline
     )
 
@@ -105,27 +105,32 @@ def format_search_text(query, tracks, page=0, per_page=5):
     end_idx = start_idx + per_page
     current_tracks = tracks[start_idx:end_idx]
 
-    text = f"🔍 Результаты поиска по запросу: {query}\n"
+    text = f"🔍 **Результаты поиска по запросу:** `{query}`\n"
     text += f"📄 *Страница {page + 1} из {(len(tracks) - 1) // per_page + 1}*\n\n"
 
     for i, track in enumerate(current_tracks, start=start_idx + 1):
-        text += f"{i}. {track['title']} [{track['duration']}]\n"
+        text += f"**{i}.** {track['title']} `[{track['duration']}]`\n"
 
     text += "\n👇 *Нажмите на кнопку с номером трека для скачивания:*"
     return text
-    @dp.message(F.text)
+
+@dp.message(F.text)
 async def search_handler(message: Message):
-    if message.text.startswith("/"):
+    if message.text.startswith("/") or message.text == "🔎 Поиск музыки":
         return
 
     query = message.text
-    status_msg = await message.answer(f"🔍 *Ищу {query}...*", parse_mode="Markdown")
+    status_msg = await message.answer(f"🔍 *Ищу `{query}`...*", parse_mode="Markdown")
 
+    # Настройки yt_dlp с обходом блокировки 429
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True,
-        'default_search': 'ytsearch15', # Ищем до 15 вариантов
+        'default_search': 'ytsearch15',
         'noplaylist': True,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'source_address': '0.0.0.0',
     }
 
     loop = asyncio.get_running_loop()
@@ -194,7 +199,7 @@ async def download_callback(callback: CallbackQuery):
 
     track = user_data['tracks'][track_idx]
     await callback.answer(f"Загрузка: {track['title']}")
-    status = await callback.message.answer(f"⬇️ *Скачиваю:* {track['title']}...", parse_mode="Markdown")
+    status = await callback.message.answer(f"⬇️ *Скачиваю:* `{track['title']}`...", parse_mode="Markdown")
 
     unique_id = str(uuid.uuid4())
     out_template = f"downloads/{unique_id}.%(ext)s"
@@ -204,6 +209,9 @@ async def download_callback(callback: CallbackQuery):
         'format': 'bestaudio/best',
         'outtmpl': out_template,
         'quiet': True,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'source_address': '0.0.0.0',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -227,7 +235,7 @@ async def download_callback(callback: CallbackQuery):
                 audio=audio, 
                 title=track['title'],
                 caption="🎧 *Cкачано с помощью вашего бота*"
-                )
+            )
             await status.delete()
             os.remove(expected_filename)
         else:
